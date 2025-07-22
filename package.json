@@ -1,6 +1,6 @@
 {
-  "name": "@heda/ai-data-visualization",
-  "version": "1.0.0",
+  "name": "@darioh/ai-data-visualization",
+  "version": "1.0.2",
   "description": "Framework-agnostic AI-powered data visualization library",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -11,7 +11,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run clean && npm run build:cjs && npm run build:esm && npm run bundle",
+    "build": "npm run clean && npm run bundle && npm run build:cjs && npm run build:esm",
     "build:cjs": "tsc --outDir dist/cjs --module CommonJS",
     "build:esm": "tsc --outDir dist/esm --module ESNext",
     "clean": "rimraf dist",

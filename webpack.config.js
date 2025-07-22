@@ -12,7 +12,8 @@ module.exports = (env, argv) => {
       library: 'AIDataVisualization',
       libraryTarget: 'umd',
       globalObject: 'this',
-      clean: true
+      // Do NOT clean the entire dist folder; we produce CJS and ESM builds there first
+      clean: false
     },
     resolve: {
       extensions: ['.ts', '.js']

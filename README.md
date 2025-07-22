@@ -8,7 +8,7 @@ A library that let's a user generate data visualization based on the specified e
 ## Installation
 
 ```bash
-npm install ai-data-visualization
+npm install @darioh/ai-data-visualization
 ```
 
 ## Quick Start
@@ -16,7 +16,7 @@ npm install ai-data-visualization
 ### Basic Usage
 
 ```javascript
-import { create } from 'ai-data-visualization';
+import { create } from '@darioh/ai-data-visualization';
 
 const viz = create({
   container: '#visualization-container',
