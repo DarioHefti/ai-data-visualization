@@ -26,6 +26,8 @@ export class AIDataVisualization {
   private improvementPrompts: string[] = [];
   // Track whether the input section is collapsed
   private inputCollapsed: boolean = false;
+  // Cached HTML for API overview list
+  private apiOverviewHtml: string = '';
 
   constructor(config: AIDataVisualizationConfig) {
     this.config = config;
@@ -81,6 +83,8 @@ export class AIDataVisualization {
    * Initialize the visualization component
    */
   private initialize(): void {
+    // Build API overview once (no heavy logic in render loop)
+    this.apiOverviewHtml = this.buildApiOverviewHtml();
     this.createHTML();
     this.attachStyles();
     this.setupEventListeners();
@@ -94,6 +98,10 @@ export class AIDataVisualization {
     const theme = this.config.theme || 'light';
     const className = this.config.className || '';
     
+    const apiOverviewBlock = this.apiOverviewHtml
+      ? `<details class="ai-data-viz__api-overview" style="margin-top:8px;"><summary>Available API Endpoints</summary>${this.apiOverviewHtml}</details>`
+      : '';
+
     this.container.innerHTML = `
       <div class="ai-data-viz ${theme} ${className}">
         <div class="ai-data-viz__header">
@@ -121,6 +129,7 @@ export class AIDataVisualization {
             <summary>Original Prompt</summary>
             <pre class="ai-data-viz__prompt-text" style="white-space: pre-wrap;"></pre>
           </details>
+          ${apiOverviewBlock}
         </div>
         
         <div class="ai-data-viz__visualization" style="display: none;">
@@ -404,6 +413,22 @@ export class AIDataVisualization {
 
       .ai-data-viz.dark .ai-data-viz__prompt-summary {
         background: #2a2a2a;
+        border-color: #444;
+        color: #ccc;
+      }
+
+      /* API overview */
+      .ai-data-viz__api-overview {
+        background: #f1f3f5;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 12px;
+        color: #333;
+      }
+
+      .ai-data-viz.dark .ai-data-viz__api-overview {
+        background: #252525;
         border-color: #444;
         color: #ccc;
       }
@@ -843,5 +868,34 @@ IMPORTANT REQUIREMENTS:
     const vizDiv = this.container.querySelector('.ai-data-viz') as HTMLDivElement;
     vizDiv.className = `ai-data-viz ${theme} ${this.config.className || ''}`;
     this.config.theme = theme;
+  }
+
+  /**
+   * Build a very simple, non-technical HTML list of available API endpoints
+   */
+  private buildApiOverviewHtml(): string {
+    try {
+      const parsed = JSON.parse(this.config.apiDescription);
+      if (!parsed || typeof parsed !== 'object' || !parsed.paths) return '';
+
+      const items: string[] = [];
+      for (const path in parsed.paths) {
+        const methods = parsed.paths[path];
+        if (methods && typeof methods === 'object') {
+          for (const method in methods) {
+            const def = methods[method];
+            const summary: string = def && def.summary ? def.summary : '';
+            items.push(`<li><code>${method.toUpperCase()} ${path}</code>${summary ? ' - ' + summary : ''}</li>`);
+          }
+        }
+      }
+
+      if (!items.length) return '';
+
+      return `<ul style="margin:8px 0 0 16px;">${items.join('')}</ul>`;
+    } catch (err) {
+      // Invalid JSON or unexpected structure
+      return '';
+    }
   }
 } 

@@ -117,6 +117,9 @@ const apiDescription =  const apiSchema = JSON.stringify({
                 }}}});
 ```
 
+if you are using the format above then we will parse your endpoints end show them to the user.
+what you need is 1: json 2: paths 3: summary
+
 ## AI Integration Examples
 
 ### OpenAI
