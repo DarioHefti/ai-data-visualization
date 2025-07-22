@@ -343,65 +343,37 @@ const viz = AIDataVisualization.create({<br>
             }
         }
 
-        function chatCompletion(message) {
-            // Azure OpenAI configuration
-            const endpoint = "https://api.openai.com/v1";
-            const apiKey = "YOUR KEY HERE";
-            const apiVersion = "2025-01-01-preview";
-            const deployment = "gpt-4.1";
-            
-            // Build Azure OpenAI URL
-            const url = `${endpoint}openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
-            
-            // Create system prompt that includes API description
-            const systemPrompt = `You are an AI assistant that generates HTML/JavaScript/CSS code for data visualizations. 
+        async function chatCompletion(prompt) {
+            const OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY';
+            const model = 'gpt-4o-mini';            // or gpt-4o, gpt-4-turbo etc.
 
-            API Description: ${apiSchema}
-                    
-            Generate complete, self-contained HTML documents that:
-            - Load Chart.js from CDN: https://cdn.jsdelivr.net/npm/chart.js
-            - Use the provided apiRequest function to fetch data
-            - Create interactive visualizations
-            - Handle errors gracefully
-            - Use professional styling
-                    
-            Return ONLY the HTML code, no other text.`;
-
-            return fetch(url, {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'api-key': apiKey
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`
                 },
                 body: JSON.stringify({
+                    model,
                     messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: message }
+                        { role: 'user', content: prompt }
                     ],
-                    max_tokens: 5000,
                     temperature: 1,
-                    top_p: 1,
-                    frequency_penalty: 0,
-                    presence_penalty: 0,
-                    stop: null
+                    max_tokens: 4096
                 })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.choices && data.choices[0] && data.choices[0].message) {
-                    return data.choices[0].message.content;
-                } else {
-                    throw new Error('Invalid response format from Azure OpenAI');
-                }
-            })
-            .catch(error => {
-               return 'Error: ' + error.message;
             });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`OpenAI API error: ${response.status} ${err}`);
+            }
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (!content) {
+                throw new Error('Invalid response from OpenAI');
+            }
+            return content;
         }
 
         function apiRequest(url) {

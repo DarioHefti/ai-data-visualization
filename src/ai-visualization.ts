@@ -509,6 +509,12 @@ export class AIDataVisualization {
       const data = event.data as IframeMessage;
       if (data.type === 'API_REQUEST' && data.requestId && data.url) {
         this.handleApiRequest(data as ApiRequestData);
+      } else if (data.type === 'IFRAME_ERROR') {
+        this.setState(VisualizationState.ERROR);
+        this.showError(data.message || 'Visualization error');
+        if (this.config.onError) {
+          this.config.onError(new Error(data.message || 'Visualization error'));
+        }
       }
     };
 
@@ -619,33 +625,33 @@ export class AIDataVisualization {
    * Build the prompt for AI visualization generation
    */
   private buildVisualizationPrompt(userMessage: string): string {
-    return `Based on the available API endpoints, please generate complete HTML/JavaScript/CSS code to visualize: "${userMessage}".
+    return `You are an expert front-end engineer who creates data visualizations.
 
-IMPORTANT REQUIREMENTS:
-- Return ONLY HTML/JavaScript/CSS code, NO OTHER TEXT
-- Generate a complete, self-contained HTML document
-- Include all necessary CSS styling for a modern, responsive design
-- Load Chart.js from CDN: https://cdn.jsdelivr.net/npm/chart.js
-- Use the provided apiRequest function to fetch data from endpoints
-- Create interactive visualizations using Chart.js or native HTML/CSS
-- Handle loading states and errors gracefully
-- Use a professional color scheme and layout
+USER REQUEST:
+"${userMessage}"
 
-CRITICAL API INTEGRATION:
-The apiRequest function is automatically available in your code. Use it like this:
+AVAILABLE API ENDPOINTS (OpenAPI-like schema):
+${this.config.apiDescription}
 
+TASK:
+Generate a COMPLETE, self-contained HTML document (including CSS & JavaScript) that satisfies the user's request by fetching data from the listed API endpoints. Use Chart.js (CDN: https://cdn.jsdelivr.net/npm/chart.js) or native web technologies.
+
+REQUIREMENTS (IMPORTANT):
+• Return ONLY HTML/JS/CSS code – no markdown, explanations or extra text.
+• Include professional, responsive styling.
+• Use the provided global function \`apiRequest(url)\` for all data calls (see usage example below).
+• Handle loading states & errors gracefully within the HTML.
+• Do NOT violate browser sandbox restrictions.
+
+EXAMPLE API USAGE (available to the code at runtime):
+\`\`\`js
 async function loadData() {
-  try {
-    const response = await apiRequest('/api/your-endpoint');
-    // Use the response data for your visualization
-    console.log('Data loaded:', response);
-  } catch (error) {
-    console.error('Failed to load data:', error);
-    // Show error message to user
-  }
+  const data = await apiRequest('/api/your-endpoint');
+  console.log(data);
 }
+\`\`\`
 
-Remember: The generated code will be executed in a sandboxed iframe with automatic API request handling.`;
+Return the finished HTML document now.`;
   }
 
   /**
@@ -654,21 +660,24 @@ Remember: The generated code will be executed in a sandboxed iframe with automat
   private buildImprovementPrompt(existingCode: string): string {
     const promptHistory = [this.originalPrompt, ...this.improvementPrompts].filter(Boolean).join('\n');
 
-    return `You are provided with an EXISTING visualization (complete HTML) and the full history of user requests. Please improve the visualization according to the LATEST request while respecting the prior context. Replace the entire document with your improved version.
+    return `You are provided with an EXISTING visualization (full HTML) generated earlier plus the complete history of user requests. Improve the visualization to satisfy the LATEST request while preserving prior context and functionality.
+
+AVAILABLE API ENDPOINTS:
+${this.config.apiDescription}
 
 EXISTING VISUALIZATION CODE START
 ${existingCode}
 EXISTING VISUALIZATION CODE END
 
-FULL USER REQUEST HISTORY (concatenate in order):
+FULL USER REQUEST HISTORY:
 ${promptHistory}
 
-IMPORTANT REQUIREMENTS:
-- Return ONLY HTML/JavaScript/CSS code – do NOT wrap it in markdown or add any commentary
-- Produce a COMPLETE, self-contained HTML document
-- Keep using the provided apiRequest bridge for data loading
-- Maintain a modern, responsive design and professional color scheme
-- Handle loading states and errors gracefully
+REQUIREMENTS:
+• Return ONLY HTML/JS/CSS code (no explanations).
+• Produce a FULL HTML document that can replace the previous one.
+• Continue to use the global \`apiRequest(url)\` helper for data access.
+• Keep styling modern and responsive.
+• Gracefully handle loading and error states.
 `;
   }
 
@@ -734,6 +743,24 @@ IMPORTANT REQUIREMENTS:
     });
   };
 })();
+</script>
+<script>
+// Global error forwarding
+window.addEventListener('error', (event) => {
+  window.parent.postMessage({
+    type: 'IFRAME_ERROR',
+    message: event.message,
+    stack: event.error && event.error.stack ? event.error.stack : undefined
+  }, '*');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  window.parent.postMessage({
+    type: 'IFRAME_ERROR',
+    message: event.reason ? (event.reason.message || String(event.reason)) : 'Unhandled rejection',
+    stack: event.reason && event.reason.stack ? event.reason.stack : undefined
+  }, '*');
+});
 </script>`;
 
     // Find the closing head tag or opening body tag to inject the script

@@ -31,11 +31,13 @@ export interface AIDataVisualizationConfig {
  * Internal message types for iframe communication
  */
 export interface IframeMessage {
-  type: 'API_REQUEST' | 'API_RESPONSE';
+  type: 'API_REQUEST' | 'API_RESPONSE' | 'IFRAME_ERROR';
   requestId?: string;
   url?: string;
   data?: any;
   error?: string;
+  message?: string;
+  stack?: string;
 }
 
 /**
