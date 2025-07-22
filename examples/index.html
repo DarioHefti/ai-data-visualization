@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Data Visualization - Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .demo-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .primary-btn {
+            background: #007bff;
+            color: white;
+        }
+        
+        .primary-btn:hover {
+            background: #0056b3;
+        }
+        
+        .secondary-btn {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .secondary-btn:hover {
+            background: #545b62;
+        }
+        
+        #ai-dashboard {
+            margin-top: 20px;
+        }
+        
+        .code-example {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Data Visualization - Demo</h1>
+        
+        <div class="demo-section">
+            <h2>Package Integration Example</h2>
+            <p>This demonstrates how to integrate the AI Data Visualization package in any web application.</p>
+            
+            <div class="code-example">
+// Basic usage:<br>
+const viz = AIDataVisualization.create({<br>
+&nbsp;&nbsp;container: '#ai-dashboard',<br>
+&nbsp;&nbsp;apiDescription: JSON.stringify(weatherApiSchema),<br>
+&nbsp;&nbsp;chatCompletion: async (message) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;// Your AI service integration (Azure OpenAI, etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return await callAzureOpenAI(message);<br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;apiRequest: async (url) => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;// Your API request handler<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return fetch(url).then(r => r.json());<br>
+&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;onError: (error) => console.error('Viz error:', error)<br>
+});
+            </div>
+            
+            <div class="controls">
+                <button class="primary-btn" onclick="initializeDemo()">Initialize Demo</button>
+                <button class="secondary-btn" onclick="toggleTheme()">Toggle Dark Theme</button>
+                <button class="secondary-btn" onclick="destroyDemo()">Destroy Instance</button>
+            </div>
+        </div>
+
+        <!-- Container for the AI visualization -->
+        <div id="ai-dashboard"></div>
+    </div>
+
+    <!-- Load the package (in production, this would be from npm) -->
+    <script src="../dist/ai-data-visualization.min.js"></script>
+    
+    <script>
+        let vizInstance = null;
+        let isDarkTheme = false;
+
+        // Weather API schema
+        const apiSchema = JSON.stringify({
+            "openapi": "3.0.0",
+            "info": {
+                "title": "Weather API",
+                "version": "1.0.0",
+                "description": "Simple weather data API for visualizations"
+            },
+            "servers": [
+                {
+                    "url": "http://localhost:3001",
+                    "description": "Local development server"
+                }
+            ],
+            "paths": {
+                "/api/cities": {
+                    "get": {
+                        "summary": "Get all available cities",
+                        "responses": {
+                            "200": {
+                                "description": "List of cities with coordinates",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {"type": "boolean"},
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "integer"},
+                                                            "name": {"type": "string"},
+                                                            "country": {"type": "string"},
+                                                            "lat": {"type": "number"},
+                                                            "lon": {"type": "number"}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "/api/weather/current": {
+                    "get": {
+                        "summary": "Get current weather for all cities",
+                        "responses": {
+                            "200": {
+                                "description": "Current weather data for all cities",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {"type": "boolean"},
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "integer"},
+                                                            "city": {"type": "string"},
+                                                            "country": {"type": "string"},
+                                                            "temperature": {"type": "integer"},
+                                                            "condition": {"type": "string"},
+                                                            "humidity": {"type": "integer"},
+                                                            "windSpeed": {"type": "integer"},
+                                                            "pressure": {"type": "integer"}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "/api/weather/stats": {
+                    "get": {
+                        "summary": "Get weather statistics for charts",
+                        "responses": {
+                            "200": {
+                                "description": "Weather statistics including temperature by city, condition distribution, and weekly trends",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {"type": "boolean"},
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "temperatureByCity": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "city": {"type": "string"},
+                                                                    "temperature": {"type": "integer"}
+                                                                }
+                                                            }
+                                                        },
+                                                        "conditionDistribution": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "condition": {"type": "string"},
+                                                                    "count": {"type": "integer"}
+                                                                }
+                                                            }
+                                                        },
+                                                        "weeklyTemperatures": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "date": {"type": "string"},
+                                                                    "avgTemp": {"type": "integer"}
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "/api/weather/forecast/{cityId}": {
+                    "get": {
+                        "summary": "Get 7-day weather forecast for specific city",
+                        "parameters": [
+                            {
+                                "name": "cityId",
+                                "in": "path",
+                                "required": true,
+                                "schema": {"type": "integer"},
+                                "description": "City ID (1-8)"
+                            }
+                        ],
+                        "responses": {
+                            "200": {
+                                "description": "7-day weather forecast",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {"type": "boolean"},
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "city": {"type": "string"},
+                                                        "country": {"type": "string"},
+                                                        "forecast": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "date": {"type": "string"},
+                                                                    "dayOfWeek": {"type": "string"},
+                                                                    "temperature": {"type": "integer"},
+                                                                    "condition": {"type": "string"},
+                                                                    "rainChance": {"type": "integer"}
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+
+        function initializeDemo() {
+            if (vizInstance) {
+                vizInstance.destroy();
+            }
+
+            try {
+                vizInstance = window.AIDataVisualization.create({
+                    container: '#ai-dashboard',
+                    apiDescription: apiSchema,
+                    chatCompletion: chatCompletion,
+                    apiRequest: apiRequest,
+                    theme: isDarkTheme ? 'dark' : 'light',
+                    onError: (error) => {
+                        console.error('Visualization error:', error);
+                        alert('Error: ' + error.message);
+                    }
+                });
+                
+                console.log('AI Data Visualization initialized successfully!');
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                alert('Failed to initialize: ' + error.message);
+            }
+        }
+
+        function chatCompletion(message) {
+            // Azure OpenAI configuration
+            const endpoint = "https://api.openai.com/v1";
+            const apiKey = "YOUR KEY HERE";
+            const apiVersion = "2025-01-01-preview";
+            const deployment = "gpt-4.1";
+            
+            // Build Azure OpenAI URL
+            const url = `${endpoint}openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+            
+            // Create system prompt that includes API description
+            const systemPrompt = `You are an AI assistant that generates HTML/JavaScript/CSS code for data visualizations. 
+
+            API Description: ${apiSchema}
+                    
+            Generate complete, self-contained HTML documents that:
+            - Load Chart.js from CDN: https://cdn.jsdelivr.net/npm/chart.js
+            - Use the provided apiRequest function to fetch data
+            - Create interactive visualizations
+            - Handle errors gracefully
+            - Use professional styling
+                    
+            Return ONLY the HTML code, no other text.`;
+
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'api-key': apiKey
+                },
+                body: JSON.stringify({
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: message }
+                    ],
+                    max_tokens: 5000,
+                    temperature: 1,
+                    top_p: 1,
+                    frequency_penalty: 0,
+                    presence_penalty: 0,
+                    stop: null
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.choices && data.choices[0] && data.choices[0].message) {
+                    return data.choices[0].message.content;
+                } else {
+                    throw new Error('Invalid response format from Azure OpenAI');
+                }
+            })
+            .catch(error => {
+               return 'Error: ' + error.message;
+            });
+        }
+
+        function apiRequest(url) {
+            // Handle both full URLs and relative paths
+            const fullUrl = url.startsWith('http') ? url : `http://localhost:3001${url}`;
+            return fetch(fullUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Return the full response object (including success, data, count)
+                    return data;
+                });
+        }
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            if (vizInstance) {
+                vizInstance.setTheme(isDarkTheme ? 'dark' : 'light');
+            }
+        }
+
+        function destroyDemo() {
+            if (vizInstance) {
+                vizInstance.destroy();
+                vizInstance = null;
+                console.log('Visualization instance destroyed.');
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            if (window.AIDataVisualization && window.AIDataVisualization.create) {
+                console.log('Package loaded successfully');
+                initializeDemo();
+            } else {
+                console.error('AIDataVisualization not found. Make sure the script is loaded.');
+                console.log('Available:', window.AIDataVisualization);
+            }
+        });
+    </script>
+</body>
+</html> 

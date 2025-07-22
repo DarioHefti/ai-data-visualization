@@ -1,0 +1,59 @@
+{
+  "name": "ai-data-visualization",
+  "version": "1.0.0",
+  "description": "Framework-agnostic AI-powered data visualization library",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run clean && npm run build:cjs && npm run build:esm && npm run bundle",
+    "build:cjs": "tsc --outDir dist/cjs --module CommonJS",
+    "build:esm": "tsc --outDir dist/esm --module ESNext",
+    "clean": "rimraf dist",
+    "bundle": "webpack --mode production",
+    "dev": "webpack serve --mode development",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "data-visualization",
+    "charts",
+    "dashboard",
+    "typescript",
+    "framework-agnostic"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ai-data-visualization.git"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "css-loader": "^6.8.1",
+    "html-webpack-plugin": "^5.5.3",
+    "rimraf": "^5.0.0",
+    "style-loader": "^3.3.3",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.0.0",
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js"
+    }
+  },
+  "peerDependencies": {
+    "chart.js": "^4.4.0"
+  },
+  "dependencies": {}
+} 
