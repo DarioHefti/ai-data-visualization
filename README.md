@@ -1,26 +1,14 @@
 # AI Data Visualization
 
-A framework-agnostic TypeScript/JavaScript library that enables AI-powered data visualization with just a few lines of code. Users can request visualizations in plain English, and the library will generate interactive charts using their API data.
+Let users create their own charts. No more, could you please add this to the diagram bla.
 
-## Features
+A library that let's a user generate data visualization based on the specified endpoints in your backend. AI will generate the code and it will be sandboxed in an iframe. The data is getting fetched from your specified API endpoints.
 
-- 🤖 **AI-Powered**: Natural language to visualization generation
-- 🎨 **Interactive Charts**: Built-in Chart.js integration
-- 🔒 **Secure**: Sandboxed iframe execution
-- 🎯 **Framework Agnostic**: Works with any web framework
-- 📱 **Responsive**: Mobile-friendly visualizations
-- 🌙 **Theme Support**: Light/dark mode built-in
-- 📦 **Zero Dependencies**: Self-contained with CDN resources
 
 ## Installation
 
 ```bash
 npm install ai-data-visualization
-```
-
-Or use directly in browser:
-```html
-<script src="https://unpkg.com/ai-data-visualization/dist/ai-data-visualization.min.js"></script>
 ```
 
 ## Quick Start
@@ -29,9 +17,6 @@ Or use directly in browser:
 
 ```javascript
 import { create } from 'ai-data-visualization';
-
-// Or for browser/CDN usage:
-// const { create } = window.AIDataVisualization;
 
 const viz = create({
   container: '#visualization-container',
@@ -76,47 +61,60 @@ interface AIDataVisualizationConfig {
 
 ## API Description Format
 
-The library supports both OpenAPI/Swagger and custom API descriptions:
+We will send your API endpoints to your AI-model so it can automatically generate the code for the diagrams and knows where and what to fetch.
 
-### OpenAPI/Swagger
-```javascript
-const apiDescription = JSON.stringify({
-  "openapi": "3.0.0",
-  "info": {
-    "title": "Your API",
-    "version": "1.0.0"
-  },
-  "paths": {
-    "/api/users": {
-      "get": {
-        "summary": "Get all users",
-        "responses": {
-          "200": {
-            "description": "List of users"
-          }
-        }
-      }
-    }
-  }
-});
-```
+If you want it to work then the API endpoints need to be self explanatory with good naming conventions and you will need to specify the return type for the apis!
+something like the following works great:
 
-### Custom Schema
+### Example Endpoint description
 ```javascript
-const apiDescription = JSON.stringify({
-  "endpoints": {
-    "/api/sales": {
-      "method": "GET",
-      "description": "Monthly sales data",
-      "returns": "Array of {month: string, sales: number}"
-    },
-    "/api/users": {
-      "method": "GET", 
-      "description": "User information",
-      "returns": "Array of user objects"
-    }
-  }
-});
+const apiDescription =  const apiSchema = JSON.stringify({
+            "openapi": "3.0.0",
+            "info": {
+                "title": "Weather API",
+                "version": "1.0.0",
+                "description": "Simple weather data API for visualizations"
+            },
+            "servers": [
+                {
+                    "url": "http://localhost:3001",
+                    "description": "Local development server"
+                }
+            ],
+            "paths": {
+                "/api/cities": {
+                    "get": {
+                        "summary": "Get all available cities",
+                        "responses": {
+                            "200": {
+                                "description": "List of cities with coordinates",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {"type": "boolean"},
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "integer"},
+                                                            "name": {"type": "string"},
+                                                            "country": {"type": "string"},
+                                                            "lat": {"type": "number"},
+                                                            "lon": {"type": "number"}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }}}});
 ```
 
 ## AI Integration Examples
@@ -184,35 +182,7 @@ const viz = create({
 });
 ```
 
-```css
-/* Custom styling */
-.my-custom-viz {
-  border: 2px solid #007bff;
-  border-radius: 12px;
-}
-
-.my-custom-viz .ai-data-viz__title {
-  color: #007bff;
-  font-size: 28px;
-}
-
-.my-custom-viz .ai-data-viz__generate-btn {
-  background: linear-gradient(45deg, #007bff, #0056b3);
-}
-```
-
-### Theme Customization
-```css
-/* Dark theme overrides */
-.ai-data-viz.dark {
-  --primary-color: #4dabf7;
-  --background-color: #1a1a1a;
-  --text-color: #ffffff;
-  --border-color: #333333;
-}
-```
-
-## Security
+## "Security"
 
 The library uses sandboxed iframes for generated visualizations with restricted permissions:
 
@@ -259,20 +229,11 @@ const viz = create({
 });
 ```
 
-## Browser Support
-
-- Chrome 60+
-- Firefox 55+
-- Safari 12+
-- Edge 79+
-
-## Development
-
-### Building from Source
+### Check out the example like so
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ai-data-visualization.git
+git clone https://github.com/DarioHefti/ai-data-visualization.git
 cd ai-data-visualization
 
 # Install dependencies
@@ -287,42 +248,3 @@ npm run dev
 # Watch mode
 npm run watch
 ```
-
-### Project Structure
-
-```
-ai-data-visualization/
-├── src/
-│   ├── index.ts              # Main entry point
-│   ├── types.ts              # TypeScript definitions
-│   └── ai-visualization.ts   # Core implementation
-├── examples/
-│   ├── index.html            # Vanilla JS example
-├── dist/                     # Compiled output
-├── package.json
-├── tsconfig.json
-├── webpack.config.js
-└── README.md
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Support
-
-- 📚 [Documentation](https://github.com/yourusername/ai-data-visualization)
-- 🐛 [Issue Tracker](https://github.com/yourusername/ai-data-visualization/issues)
-- 💬 [Discussions](https://github.com/yourusername/ai-data-visualization/discussions)
-
----
-
-Made with ❤️ for developers who want AI-powered data visualization without the complexity. 
