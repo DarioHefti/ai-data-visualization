@@ -19,6 +19,13 @@ export class AIDataVisualization {
   // Removed unused pendingRequests map to reduce memory footprint and complexity
   // private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (error: Error) => void }>();
   private messageListener?: (event: MessageEvent) => void;
+  // Store the last generated visualization code so we can send it back to the AI for improvements
+  private lastGeneratedCode: string | null = null;
+  // Store user requests: first original prompt and subsequent improvements
+  private originalPrompt: string | null = null;
+  private improvementPrompts: string[] = [];
+  // Track whether the input section is collapsed
+  private inputCollapsed: boolean = false;
 
   constructor(config: AIDataVisualizationConfig) {
     this.config = config;
@@ -92,6 +99,7 @@ export class AIDataVisualization {
         <div class="ai-data-viz__header">
           <h2 class="ai-data-viz__title">AI Data Visualization</h2>
           <p class="ai-data-viz__subtitle">Ask for any visualization and I'll generate it using your API data</p>
+          <button class="ai-data-viz__toggle-input" type="button" aria-label="Hide input">&minus;</button>
         </div>
         
         <div class="ai-data-viz__input-section">
@@ -105,10 +113,14 @@ export class AIDataVisualization {
               <span class="ai-data-viz__btn-text">Generate Visualization</span>
               <div class="ai-data-viz__spinner" style="display: none;"></div>
             </button>
+            <button class="ai-data-viz__clear-btn" type="button" style="display: none;">
+              Clear Visualization
+            </button>
           </div>
-          <button class="ai-data-viz__clear-btn" type="button" style="display: none;">
-            Clear Visualization
-          </button>
+          <details class="ai-data-viz__prompt-summary" style="display:none; margin-top: 8px;">
+            <summary>Original Prompt</summary>
+            <pre class="ai-data-viz__prompt-text" style="white-space: pre-wrap;"></pre>
+          </details>
         </div>
         
         <div class="ai-data-viz__visualization" style="display: none;">
@@ -170,6 +182,7 @@ export class AIDataVisualization {
       .ai-data-viz__header {
         margin-bottom: 24px;
         text-align: center;
+        position: relative;
       }
 
       .ai-data-viz__title {
@@ -181,6 +194,24 @@ export class AIDataVisualization {
 
       .ai-data-viz.dark .ai-data-viz__title {
         color: #ffffff;
+      }
+
+      /* Toggle input button */
+      .ai-data-viz__toggle-input {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: transparent;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: inherit;
+        line-height: 1;
+        padding: 4px 8px;
+      }
+
+      .ai-data-viz__toggle-input:hover {
+        opacity: 0.7;
       }
 
       .ai-data-viz__subtitle {
@@ -361,6 +392,22 @@ export class AIDataVisualization {
         background: #c82333;
       }
 
+      /* Prompt summary */
+      .ai-data-viz__prompt-summary {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 12px;
+        color: #333;
+      }
+
+      .ai-data-viz.dark .ai-data-viz__prompt-summary {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #ccc;
+      }
+
       @media (max-width: 768px) {
         .ai-data-viz {
           padding: 16px;
@@ -389,10 +436,12 @@ export class AIDataVisualization {
     const generateBtn = this.container.querySelector('.ai-data-viz__generate-btn') as HTMLButtonElement;
     const clearBtn = this.container.querySelector('.ai-data-viz__clear-btn') as HTMLButtonElement;
     const retryBtn = this.container.querySelector('.ai-data-viz__error-retry') as HTMLButtonElement;
-
+    const toggleBtn = this.container.querySelector('.ai-data-viz__toggle-input') as HTMLButtonElement;
+    
     generateBtn.addEventListener('click', () => this.generateVisualization());
     clearBtn.addEventListener('click', () => this.clearVisualization());
     retryBtn.addEventListener('click', () => this.generateVisualization());
+    toggleBtn.addEventListener('click', () => this.toggleInputSection());
 
     // Enable generate button only when there's text
     textarea.addEventListener('input', () => {
@@ -401,6 +450,25 @@ export class AIDataVisualization {
 
     // Initial state
     generateBtn.disabled = true;
+  }
+
+  /**
+   * Toggle visibility of the input section
+   */
+  private toggleInputSection(): void {
+    const inputSection = this.container.querySelector('.ai-data-viz__input-section') as HTMLDivElement;
+    const toggleBtn = this.container.querySelector('.ai-data-viz__toggle-input') as HTMLButtonElement;
+
+    this.inputCollapsed = !this.inputCollapsed;
+    if (this.inputCollapsed) {
+      inputSection.style.display = 'none';
+      toggleBtn.textContent = '+';
+      toggleBtn.setAttribute('aria-label', 'Show input');
+    } else {
+      inputSection.style.display = 'block';
+      toggleBtn.textContent = '−';
+      toggleBtn.setAttribute('aria-label', 'Hide input');
+    }
   }
 
   /**
@@ -466,10 +534,23 @@ export class AIDataVisualization {
     }
 
     try {
+      const isImprovement = this.lastGeneratedCode !== null && this.state === VisualizationState.DISPLAYING;
+
+      // Track prompt history
+      if (isImprovement) {
+        this.improvementPrompts.push(message);
+      } else {
+        this.originalPrompt = message;
+        this.improvementPrompts = [];
+      }
+
       this.setState(VisualizationState.GENERATING);
       this.hideError();
 
-      const prompt = this.buildVisualizationPrompt(message);
+      const prompt = isImprovement
+        ? this.buildImprovementPrompt(this.lastGeneratedCode as string)
+        : this.buildVisualizationPrompt(message);
+
       const htmlResponse = await this.config.chatCompletion(prompt);
 
       if (!htmlResponse || !htmlResponse.trim()) {
@@ -480,6 +561,22 @@ export class AIDataVisualization {
       }
 
       this.displayVisualization(htmlResponse);
+      // Save generated code and prompt for future improvements and display
+      this.lastGeneratedCode = htmlResponse;
+
+      // Update prompt summary UI with full history
+      const promptSummary = this.container.querySelector('.ai-data-viz__prompt-summary') as HTMLDetailsElement;
+      const promptTextEl = this.container.querySelector('.ai-data-viz__prompt-text') as HTMLElement;
+      if (promptSummary && promptTextEl) {
+        const allPrompts = [this.originalPrompt, ...this.improvementPrompts].filter(Boolean).join('\n');
+        promptTextEl.textContent = allPrompts;
+        promptSummary.style.display = 'block';
+        promptSummary.open = false; // keep collapsed by default
+      }
+
+      // Clear textarea for next improvement
+      textarea.value = '';
+
       this.setState(VisualizationState.DISPLAYING);
       
     } catch (error) {
@@ -524,6 +621,30 @@ async function loadData() {
 }
 
 Remember: The generated code will be executed in a sandboxed iframe with automatic API request handling.`;
+  }
+
+  /**
+   * Build the prompt for improving an existing visualization
+   */
+  private buildImprovementPrompt(existingCode: string): string {
+    const promptHistory = [this.originalPrompt, ...this.improvementPrompts].filter(Boolean).join('\n');
+
+    return `You are provided with an EXISTING visualization (complete HTML) and the full history of user requests. Please improve the visualization according to the LATEST request while respecting the prior context. Replace the entire document with your improved version.
+
+EXISTING VISUALIZATION CODE START
+${existingCode}
+EXISTING VISUALIZATION CODE END
+
+FULL USER REQUEST HISTORY (concatenate in order):
+${promptHistory}
+
+IMPORTANT REQUIREMENTS:
+- Return ONLY HTML/JavaScript/CSS code – do NOT wrap it in markdown or add any commentary
+- Produce a COMPLETE, self-contained HTML document
+- Keep using the provided apiRequest bridge for data loading
+- Maintain a modern, responsive design and professional color scheme
+- Handle loading states and errors gracefully
+`;
   }
 
   /**
@@ -626,6 +747,18 @@ Remember: The generated code will be executed in a sandboxed iframe with automat
        this.iframe.srcdoc = '';
        this.iframe = undefined as any;
      }
+
+    // Reset stored code and prompt history so future generations start fresh
+    this.lastGeneratedCode = null;
+    this.originalPrompt = null;
+    this.improvementPrompts = [];
+    // Hide and reset prompt summary
+    const promptSummary = this.container.querySelector('.ai-data-viz__prompt-summary') as HTMLDetailsElement;
+    const promptTextEl = this.container.querySelector('.ai-data-viz__prompt-text') as HTMLElement;
+    if (promptSummary && promptTextEl) {
+      promptSummary.style.display = 'none';
+      promptTextEl.textContent = '';
+    }
   }
 
   /**
@@ -646,9 +779,15 @@ Remember: The generated code will be executed in a sandboxed iframe with automat
         btnSpinner.style.display = 'block';
         textarea.disabled = true;
         break;
-        
-      case VisualizationState.IDLE:
       case VisualizationState.DISPLAYING:
+        // After a visualization is shown we allow the user to request improvements
+        generateBtn.disabled = !textarea.value.trim();
+        btnText.textContent = 'Improve Visualization';
+        btnSpinner.style.display = 'none';
+        textarea.disabled = false;
+        break;
+ 
+      case VisualizationState.IDLE:
       case VisualizationState.ERROR:
         generateBtn.disabled = !textarea.value.trim();
         btnText.textContent = 'Generate Visualization';

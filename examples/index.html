@@ -329,6 +329,7 @@ const viz = AIDataVisualization.create({<br>
                     chatCompletion: chatCompletion,
                     apiRequest: apiRequest,
                     theme: isDarkTheme ? 'dark' : 'light',
+                    iframeHeight: 800,
                     onError: (error) => {
                         console.error('Visualization error:', error);
                         alert('Error: ' + error.message);
