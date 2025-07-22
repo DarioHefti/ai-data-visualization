@@ -28,11 +28,11 @@
     "typescript",
     "framework-agnostic"
   ],
-  "author": "Your Name",
+  "author": "Dario Hefti",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/ai-data-visualization.git"
+    "url": "https://github.com/DarioHefti/ai-data-visualization.git"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
