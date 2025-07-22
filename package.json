@@ -1,5 +1,5 @@
 {
-  "name": "ai-data-visualization",
+  "name": "@heda/ai-data-visualization",
   "version": "1.0.0",
   "description": "Framework-agnostic AI-powered data visualization library",
   "main": "dist/cjs/index.js",
@@ -18,7 +18,9 @@
     "bundle": "webpack --mode production",
     "dev": "webpack serve --mode development",
     "watch": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "prepare": "npm run build",
+    "test": "echo \"No tests specified\" && exit 0",
+    "prepublishOnly": "npm run test && npm run build"
   },
   "keywords": [
     "ai",
@@ -30,9 +32,16 @@
   ],
   "author": "Dario Hefti",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/DarioHefti/ai-data-visualization.git"
+  },
+  "homepage": "https://github.com/DarioHefti/ai-data-visualization#readme",
+  "bugs": {
+    "url": "https://github.com/DarioHefti/ai-data-visualization/issues"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
