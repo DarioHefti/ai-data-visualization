@@ -25,6 +25,13 @@ export interface AIDataVisualizationConfig {
   
   /** Optional iframe height (default: 600px) */
   iframeHeight?: number;
+
+  /**
+   * Optional callback invoked when the user clicks "Publish" on a generated diagram.
+   * You receive the diagram's HTML code and the original prompt so you can persist
+   * or share it as needed (e.g., save to database, upload to CMS, etc.).
+   */
+  publishGeneratedDiagram?: (diagramHtml: string, prompt: string) => void | Promise<void>;
 }
 
 /**

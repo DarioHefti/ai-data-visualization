@@ -8,6 +8,13 @@ import {
   AIDataVisualizationError
 } from './types';
 
+// Persisted item structure for history
+interface VisualizationHistoryItem {
+  prompt: string;
+  html: string;
+  timestamp: number;
+}
+
 /**
  * Main AI Data Visualization class
  */
@@ -26,6 +33,11 @@ export class AIDataVisualization {
   private improvementPrompts: string[] = [];
   // Track whether the input section is collapsed
   private inputCollapsed: boolean = false;
+  // History of generated visualizations
+  private history: VisualizationHistoryItem[] = [];
+  private readonly HISTORY_KEY = 'aiDataVizHistory';
+  // Index of the history item currently being viewed/edited; null if working on a fresh visualization
+  private activeHistoryIndex: number | null = null;
   // Cached HTML for API overview list
   private apiOverviewHtml: string = '';
 
@@ -83,12 +95,16 @@ export class AIDataVisualization {
    * Initialize the visualization component
    */
   private initialize(): void {
+    // Load persisted history
+    this.loadHistory();
     // Build API overview once (no heavy logic in render loop)
     this.apiOverviewHtml = this.buildApiOverviewHtml();
     this.createHTML();
     this.attachStyles();
     this.setupEventListeners();
     this.setupMessageListener();
+    // Render history list
+    this.renderHistoryList();
   }
 
   /**
@@ -141,6 +157,13 @@ export class AIDataVisualization {
             <iframe class="ai-data-viz__iframe" sandbox="allow-scripts"></iframe>
           </div>
         </div>
+        <details class="ai-data-viz__history" style="margin-top:12px;">
+          <summary class="ai-data-viz__history-summary">
+            <span>Diagram History</span>
+            <button type="button" title="Clear entire history" class="ai-data-viz__history-clear-btn">&times;</button>
+          </summary>
+          <ul class="ai-data-viz__history-list"></ul>
+        </details>
         
         <div class="ai-data-viz__error" style="display: none;">
           <div class="ai-data-viz__error-content">
@@ -433,6 +456,86 @@ export class AIDataVisualization {
         color: #ccc;
       }
 
+      /* Diagram history container */
+      .ai-data-viz__history {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 12px;
+        color: #333;
+      }
+
+      .ai-data-viz.dark .ai-data-viz__history {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #ccc;
+      }
+
+      /* History list */
+      .ai-data-viz__history-list {
+        margin: 6px 0 0 20px;
+        padding: 0;
+        list-style: disc;
+      }
+      .ai-data-viz__history-list li {
+        cursor: pointer;
+        padding: 4px 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .ai-data-viz__history-summary {
+        cursor: pointer;
+        position: relative;
+        padding-right: 18px; /* space for clear button */
+      }
+      .ai-data-viz__history-clear-btn {
+        border: none;
+        color: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        position: absolute;
+        right: 0;
+        top: 0;
+      }
+      .ai-data-viz__history-btn-div {
+        display: flex;
+        gap: 4px;
+      }
+      .ai-data-viz__history-clear-btn:hover { opacity: 0.7; }
+      .ai-data-viz__history-publish-btn {
+        background: #007bff;
+        border: none;
+        color: #fff;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .ai-data-viz__history-publish-btn:hover { opacity: 0.85; }
+      .ai-data-viz__history-remove-btn {
+        background:rgb(54, 54, 54);
+        border: none;
+        color: #fff;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .ai-data-viz__history-remove-btn:hover { opacity: 0.7; }
+      .ai-data-viz.dark .ai-data-viz__history-list li {
+        border-color: #444;
+      }
+      .ai-data-viz__history-list li:hover {
+        background: #f0f0f0;
+      }
+      .ai-data-viz.dark .ai-data-viz__history-list li:hover {
+        background: #333;
+      }
+
       @media (max-width: 768px) {
         .ai-data-viz {
           padding: 16px;
@@ -462,11 +565,72 @@ export class AIDataVisualization {
     const clearBtn = this.container.querySelector('.ai-data-viz__clear-btn') as HTMLButtonElement;
     const retryBtn = this.container.querySelector('.ai-data-viz__error-retry') as HTMLButtonElement;
     const toggleBtn = this.container.querySelector('.ai-data-viz__toggle-input') as HTMLButtonElement;
+    const historyList = this.container.querySelector('.ai-data-viz__history-list') as HTMLUListElement;
+    const clearHistoryBtn = this.container.querySelector('.ai-data-viz__history-clear-btn') as HTMLButtonElement;
     
     generateBtn.addEventListener('click', () => this.generateVisualization());
     clearBtn.addEventListener('click', () => this.clearVisualization());
     retryBtn.addEventListener('click', () => this.generateVisualization());
     toggleBtn.addEventListener('click', () => this.toggleInputSection());
+    // History click
+    historyList.addEventListener('click', (e) => {
+      const publishBtn = (e.target as HTMLElement).closest('.ai-data-viz__history-publish-btn');
+      const removeBtn = (e.target as HTMLElement).closest('.ai-data-viz__history-remove-btn');
+      if (publishBtn) {
+        e.stopPropagation();
+        const li = publishBtn.closest('li');
+        if (!li) return;
+        const idx = parseInt(li.getAttribute('data-index') || '-1', 10);
+        if (idx >= 0 && idx < this.history.length) {
+          const item = this.history[idx];
+          if (this.config.publishGeneratedDiagram) {
+            try {
+              this.config.publishGeneratedDiagram(item.html, item.prompt);
+            } catch (err) {
+              console.error('publishGeneratedDiagram error', err);
+            }
+          } else {
+            console.warn('publishGeneratedDiagram callback not provided');
+          }
+        }
+        return;
+      }
+      if (removeBtn) {
+        e.stopPropagation();
+        const li = removeBtn.closest('li');
+        if (!li) return;
+        const idx = parseInt(li.getAttribute('data-index') || '-1', 10);
+        if (idx >= 0 && idx < this.history.length) {
+          this.removeHistory(idx);
+        }
+        return;
+      }
+
+      const li = (e.target as HTMLElement).closest('li');
+      if (!li) return;
+      const index = parseInt(li.getAttribute('data-index') || '-1', 10);
+      if (index >= 0 && index < this.history.length) {
+        const item = this.history[index];
+        // Set this history item as the active visualization context
+        this.activeHistoryIndex = index;
+        this.displayVisualization(item.html);
+        const textarea = this.container.querySelector('.ai-data-viz__textarea') as HTMLTextAreaElement;
+        textarea.value = '';
+        // Update prompt summary UI
+        const promptSummary = this.container.querySelector('.ai-data-viz__prompt-summary') as HTMLDetailsElement;
+        const promptTextEl = this.container.querySelector('.ai-data-viz__prompt-text') as HTMLElement;
+        if (promptSummary && promptTextEl) {
+          promptTextEl.textContent = item.prompt;
+          promptSummary.style.display = 'block';
+          promptSummary.open = false;
+        }
+        // Prepare context for improvements
+        this.originalPrompt = item.prompt;
+        this.improvementPrompts = [];
+        this.lastGeneratedCode = item.html;
+        this.setState(VisualizationState.DISPLAYING);
+      }
+    });
 
     // Enable generate button only when there's text
     textarea.addEventListener('input', () => {
@@ -475,6 +639,11 @@ export class AIDataVisualization {
 
     // Initial state
     generateBtn.disabled = true;
+
+    // Clear history handler
+    clearHistoryBtn.addEventListener('click', () => {
+      this.clearHistory();
+    });
   }
 
   /**
@@ -582,7 +751,8 @@ export class AIDataVisualization {
         ? this.buildImprovementPrompt(this.lastGeneratedCode as string)
         : this.buildVisualizationPrompt(message);
 
-      const htmlResponse = await this.config.chatCompletion(prompt);
+      let htmlResponse = await this.config.chatCompletion(prompt);
+      htmlResponse = this.sanitizeHtmlResponse(htmlResponse);
 
       if (!htmlResponse || !htmlResponse.trim()) {
         throw new AIDataVisualizationError(
@@ -607,6 +777,16 @@ export class AIDataVisualization {
 
       // Clear textarea for next improvement
       textarea.value = '';
+
+      // Persist or replace in history
+      const historyItem: VisualizationHistoryItem = { prompt: this.originalPrompt || message, html: htmlResponse, timestamp: Date.now() };
+      if (isImprovement && this.activeHistoryIndex !== null) {
+        this.replaceHistory(this.activeHistoryIndex, historyItem);
+      } else {
+        this.saveHistory(historyItem);
+        this.activeHistoryIndex = 0; // newest item index
+      }
+      this.renderHistoryList();
 
       this.setState(VisualizationState.DISPLAYING);
       
@@ -642,8 +822,9 @@ REQUIREMENTS (IMPORTANT):
 • Use the provided global function \`apiRequest(url)\` for all data calls (see usage example below).
 • Handle loading states & errors gracefully within the HTML.
 • Do NOT violate browser sandbox restrictions.
+• Try to use all the available space for the diagram do NOT set max height or width.
 
-EXAMPLE API USAGE (available to the code at runtime):
+EXAMPLE API USAGE:
 \`\`\`js
 async function loadData() {
   const data = await apiRequest('/api/your-endpoint');
@@ -655,11 +836,10 @@ Return the finished HTML document now.`;
   }
 
   /**
-   * Build the prompt for improving an existing visualization
+   * Build prompt for improving an existing visualization
    */
   private buildImprovementPrompt(existingCode: string): string {
     const promptHistory = [this.originalPrompt, ...this.improvementPrompts].filter(Boolean).join('\n');
-
     return `You are provided with an EXISTING visualization (full HTML) generated earlier plus the complete history of user requests. Improve the visualization to satisfy the LATEST request while preserving prior context and functionality.
 
 AVAILABLE API ENDPOINTS:
@@ -677,153 +857,81 @@ REQUIREMENTS:
 • Produce a FULL HTML document that can replace the previous one.
 • Continue to use the global \`apiRequest(url)\` helper for data access.
 • Keep styling modern and responsive.
-• Gracefully handle loading and error states.
-`;
+• Gracefully handle loading and error states.`;
   }
 
-  /**
-   * Display the generated visualization in iframe
-   */
+  /** Display the generated visualization in iframe */
   private displayVisualization(htmlContent: string): void {
     const visualizationDiv = this.container.querySelector('.ai-data-viz__visualization') as HTMLDivElement;
     const loadingDiv = this.container.querySelector('.ai-data-viz__loading') as HTMLDivElement;
     const clearBtn = this.container.querySelector('.ai-data-viz__clear-btn') as HTMLButtonElement;
-    
-    // Show visualization section
+
     visualizationDiv.style.display = 'block';
     loadingDiv.style.display = 'none';
     clearBtn.style.display = 'inline-block';
 
-    // Inject API bridge script into the HTML content
-    const modifiedHtmlContent = this.injectApiBridge(htmlContent);
-
-    // Create and setup iframe
+    const modifiedHtml = this.injectApiBridge(htmlContent);
     this.iframe = this.container.querySelector('.ai-data-viz__iframe') as HTMLIFrameElement;
-    this.iframe.srcdoc = modifiedHtmlContent;
+    this.iframe.srcdoc = modifiedHtml;
   }
 
-  /**
-   * Inject API bridge script into HTML content
-   */
+  /** Inject parent↔iframe bridge */
   private injectApiBridge(htmlContent: string): string {
-    const apiBridgeScript = `
-<script>
-(function() {
-  // Define apiRequest function for iframe communication
-  window.apiRequest = function(url) {
-    return new Promise((resolve, reject) => {
-      const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      
-      const messageHandler = (event) => {
-        const data = event.data;
-        if (data && data.type === 'API_RESPONSE' && data.requestId === requestId) {
-          window.removeEventListener('message', messageHandler);
-          if (data.error) {
-            reject(new Error(data.error));
-          } else {
-            resolve(data.data);
-          }
-        }
-      };
+    const bridge = `
+<script>(function(){window.apiRequest=function(u){return new Promise((res,rej)=>{const id='req_'+Date.now()+'_'+Math.random().toString(36).substr(2,9);function h(e){const d=e.data;if(d&&d.type==='API_RESPONSE'&&d.requestId===id){window.removeEventListener('message',h);d.error?rej(new Error(d.error)):res(d.data);}}window.addEventListener('message',h);window.parent.postMessage({type:'API_REQUEST',requestId:id,url:u},'*');setTimeout(()=>{window.removeEventListener('message',h);rej(new Error('API request timeout'));},3e4);});};})();</script>
+<script>window.addEventListener('error',e=>{window.parent.postMessage({type:'IFRAME_ERROR',message:e.message,stack:e.error&&e.error.stack},'*');});window.addEventListener('unhandledrejection',e=>{window.parent.postMessage({type:'IFRAME_ERROR',message:e.reason?e.reason.message||String(e.reason):'Unhandled rejection',stack:e.reason&&e.reason.stack},'*');});</script>`;
 
-      window.addEventListener('message', messageHandler);
-
-      // Send request to parent window
-      window.parent.postMessage({
-        type: 'API_REQUEST',
-        requestId: requestId,
-        url: url
-      }, '*');
-      
-      // Add timeout to prevent hanging requests
-      setTimeout(() => {
-        window.removeEventListener('message', messageHandler);
-        reject(new Error('API request timeout'));
-      }, 30000);
-    });
-  };
-})();
-</script>
-<script>
-// Global error forwarding
-window.addEventListener('error', (event) => {
-  window.parent.postMessage({
-    type: 'IFRAME_ERROR',
-    message: event.message,
-    stack: event.error && event.error.stack ? event.error.stack : undefined
-  }, '*');
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  window.parent.postMessage({
-    type: 'IFRAME_ERROR',
-    message: event.reason ? (event.reason.message || String(event.reason)) : 'Unhandled rejection',
-    stack: event.reason && event.reason.stack ? event.reason.stack : undefined
-  }, '*');
-});
-</script>`;
-
-    // Find the closing head tag or opening body tag to inject the script
-    const headCloseIndex = htmlContent.toLowerCase().indexOf('</head>');
-    const bodyOpenIndex = htmlContent.toLowerCase().indexOf('<body');
-    
-    if (headCloseIndex !== -1) {
-      // Inject before closing head tag
-      return htmlContent.slice(0, headCloseIndex) + apiBridgeScript + htmlContent.slice(headCloseIndex);
-    } else if (bodyOpenIndex !== -1) {
-      // Inject after opening body tag
-      const bodyTagEnd = htmlContent.indexOf('>', bodyOpenIndex) + 1;
-      return htmlContent.slice(0, bodyTagEnd) + apiBridgeScript + htmlContent.slice(bodyTagEnd);
-    } else {
-      // Fallback: prepend to the content
-      return apiBridgeScript + htmlContent;
+    const headClose = htmlContent.toLowerCase().indexOf('</head>');
+    if (headClose !== -1) return htmlContent.slice(0, headClose) + bridge + htmlContent.slice(headClose);
+    const bodyOpen = htmlContent.toLowerCase().indexOf('<body');
+    if (bodyOpen !== -1) {
+      const bodyTagEnd = htmlContent.indexOf('>', bodyOpen) + 1;
+      return htmlContent.slice(0, bodyTagEnd) + bridge + htmlContent.slice(bodyTagEnd);
     }
+    return bridge + htmlContent;
   }
 
-  /**
-   * Clear the current visualization
-   */
+  /** Clean AI response by stripping ```html or ``` code fences */
+  private sanitizeHtmlResponse(raw: string): string {
+    let cleaned = raw.trim();
+    // Remove leading ```html or ```
+    cleaned = cleaned.replace(/^```\s*html\s*/i, '').replace(/^```/, '');
+    // Remove trailing ```
+    cleaned = cleaned.replace(/```\s*$/i, '').trim();
+    return cleaned;
+  }
+
+  /** Clear current visualization */
   public clearVisualization(): void {
     const visualizationDiv = this.container.querySelector('.ai-data-viz__visualization') as HTMLDivElement;
     const clearBtn = this.container.querySelector('.ai-data-viz__clear-btn') as HTMLButtonElement;
-    const textarea = this.container.querySelector('.ai-data-viz__textarea') as HTMLTextAreaElement;
-    
+
     visualizationDiv.style.display = 'none';
     clearBtn.style.display = 'none';
-    textarea.value = '';
-    
+
     this.setState(VisualizationState.IDLE);
     this.hideError();
-    
-         if (this.iframe) {
-       this.iframe.srcdoc = '';
-       this.iframe = undefined as any;
-     }
 
-    // Reset stored code and prompt history so future generations start fresh
+    if (this.iframe) { this.iframe.srcdoc = ''; }
+    this.iframe = undefined as any;
+
     this.lastGeneratedCode = null;
+    this.activeHistoryIndex = null;
     this.originalPrompt = null;
     this.improvementPrompts = [];
-    // Hide and reset prompt summary
+
     const promptSummary = this.container.querySelector('.ai-data-viz__prompt-summary') as HTMLDetailsElement;
     const promptTextEl = this.container.querySelector('.ai-data-viz__prompt-text') as HTMLElement;
-    if (promptSummary && promptTextEl) {
-      promptSummary.style.display = 'none';
-      promptTextEl.textContent = '';
-    }
+    if (promptSummary && promptTextEl) { promptSummary.style.display = 'none'; promptTextEl.textContent = ''; }
   }
 
-  /**
-   * Set the current state and update UI
-   */
+  /** Update UI state */
   private setState(state: VisualizationState): void {
-    this.state = state;
-    
     const generateBtn = this.container.querySelector('.ai-data-viz__generate-btn') as HTMLButtonElement;
     const btnText = generateBtn.querySelector('.ai-data-viz__btn-text') as HTMLSpanElement;
     const btnSpinner = generateBtn.querySelector('.ai-data-viz__spinner') as HTMLDivElement;
     const textarea = this.container.querySelector('.ai-data-viz__textarea') as HTMLTextAreaElement;
-    
+
     switch (state) {
       case VisualizationState.GENERATING:
         generateBtn.disabled = true;
@@ -832,13 +940,11 @@ window.addEventListener('unhandledrejection', (event) => {
         textarea.disabled = true;
         break;
       case VisualizationState.DISPLAYING:
-        // After a visualization is shown we allow the user to request improvements
         generateBtn.disabled = !textarea.value.trim();
         btnText.textContent = 'Improve Visualization';
         btnSpinner.style.display = 'none';
         textarea.disabled = false;
         break;
- 
       case VisualizationState.IDLE:
       case VisualizationState.ERROR:
         generateBtn.disabled = !textarea.value.trim();
@@ -849,80 +955,89 @@ window.addEventListener('unhandledrejection', (event) => {
     }
   }
 
-  /**
-   * Show error message
-   */
-  private showError(message: string): void {
+  private showError(msg: string): void {
     const errorDiv = this.container.querySelector('.ai-data-viz__error') as HTMLDivElement;
-    const errorMessage = this.container.querySelector('.ai-data-viz__error-message') as HTMLParagraphElement;
-    
-    errorMessage.textContent = message;
-    errorDiv.style.display = 'block';
+    const p = this.container.querySelector('.ai-data-viz__error-message') as HTMLParagraphElement;
+    p.textContent = msg; errorDiv.style.display = 'block';
   }
 
-  /**
-   * Hide error message
-   */
   private hideError(): void {
     const errorDiv = this.container.querySelector('.ai-data-viz__error') as HTMLDivElement;
     errorDiv.style.display = 'none';
   }
 
-  /**
-   * Destroy the visualization instance and clean up
-   */
   public destroy(): void {
-    if (this.messageListener) {
-      window.removeEventListener('message', this.messageListener);
-    }
-    
-         // pendingRequests map removed – nothing to clear
-     this.container.innerHTML = '';
-     this.iframe = undefined as any;
+    if (this.messageListener) window.removeEventListener('message', this.messageListener);
+    this.container.innerHTML = '';
+    this.iframe = undefined as any;
   }
 
-  /**
-   * Get current state
-   */
-  public getState(): VisualizationState {
-    return this.state;
-  }
+  public getState(): VisualizationState { return this.state; }
 
-  /**
-   * Update theme
-   */
-  public setTheme(theme: 'light' | 'dark' | 'auto'): void {
+  public setTheme(theme: 'light'|'dark'|'auto'): void {
     const vizDiv = this.container.querySelector('.ai-data-viz') as HTMLDivElement;
     vizDiv.className = `ai-data-viz ${theme} ${this.config.className || ''}`;
     this.config.theme = theme;
   }
 
-  /**
-   * Build a very simple, non-technical HTML list of available API endpoints
-   */
+  /** (re)build simple API overview list */
   private buildApiOverviewHtml(): string {
     try {
       const parsed = JSON.parse(this.config.apiDescription);
       if (!parsed || typeof parsed !== 'object' || !parsed.paths) return '';
-
       const items: string[] = [];
       for (const path in parsed.paths) {
         const methods = parsed.paths[path];
-        if (methods && typeof methods === 'object') {
-          for (const method in methods) {
-            const def = methods[method];
-            const summary: string = def && def.summary ? def.summary : '';
-            items.push(`<li><code>${method.toUpperCase()} ${path}</code>${summary ? ' - ' + summary : ''}</li>`);
+        if (methods) {
+          for (const m in methods) {
+            const summary = methods[m]?.summary || '';
+            items.push(`<li><code>${m.toUpperCase()} ${path}</code>${summary ? ' - '+summary : ''}</li>`);
           }
         }
       }
+      return items.length ? `<ul style="margin:8px 0 0 16px;">${items.join('')}</ul>` : '';
+    } catch { return ''; }
+  }
 
-      if (!items.length) return '';
+  private loadHistory(): void {
+    try { const raw = localStorage.getItem(this.HISTORY_KEY); if (raw) this.history = JSON.parse(raw); } catch {}
+  }
 
-      return `<ul style="margin:8px 0 0 16px;">${items.join('')}</ul>`;
-    } catch (err) {
-      // Invalid JSON or unexpected structure
-      return '';
-    }
+  private saveHistory(item: VisualizationHistoryItem): void {
+    this.history.unshift(item); this.history = this.history.slice(0,10);
+    try { localStorage.setItem(this.HISTORY_KEY, JSON.stringify(this.history)); } catch {}
+  }
+
+  private replaceHistory(idx: number, item: VisualizationHistoryItem): void {
+    if (idx<0||idx>=this.history.length) return; this.history[idx]=item;
+    try { localStorage.setItem(this.HISTORY_KEY, JSON.stringify(this.history)); } catch {}
+  }
+
+  private renderHistoryList(): void {
+    const list = this.container.querySelector('.ai-data-viz__history-list') as HTMLUListElement | null;
+    if (!list) return; list.innerHTML='';
+    this.history.forEach((item,idx)=>{
+      const li=document.createElement('li'); li.setAttribute('data-index',String(idx));
+      const span=document.createElement('span'); span.textContent=`${new Date(item.timestamp).toLocaleString()} — ${item.prompt.slice(0,60)}`;
+
+      const btnDiv = document.createElement('div');
+      btnDiv.className = 'ai-data-viz__history-btn-div';
+      const btn=document.createElement('button'); btn.type='button'; btn.textContent='Publish'; btn.className='ai-data-viz__history-publish-btn';
+      const rmBtn=document.createElement('button'); rmBtn.type='button'; rmBtn.textContent='Remove'; rmBtn.className='ai-data-viz__history-remove-btn';
+
+      btnDiv.appendChild(btn); btnDiv.appendChild(rmBtn);
+      li.appendChild(span); li.appendChild(btnDiv); list.appendChild(li);
+    });
+  }
+
+  private clearHistory(): void {
+    this.history=[]; this.activeHistoryIndex=null; try{localStorage.removeItem(this.HISTORY_KEY);}catch{} this.renderHistoryList();
+  }
+
+  private removeHistory(idx: number): void {
+    if (idx < 0 || idx >= this.history.length) return;
+    this.history.splice(idx,1);
+    try { localStorage.setItem(this.HISTORY_KEY, JSON.stringify(this.history)); } catch {}
+    this.renderHistoryList();
   }
 } 
