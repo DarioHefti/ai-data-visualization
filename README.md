@@ -56,6 +56,7 @@ interface AIDataVisualizationConfig {
   theme?: 'light' | 'dark' | 'auto';        // UI theme
   className?: string;                       // Custom CSS class
   iframeHeight?: number;                    // Iframe height in pixels (default: 600)
+  publishGeneratedDiagram?: (html: string, prompt: string) => void | Promise<void>; // Callback when user clicks Publish
 }
 ```
 
