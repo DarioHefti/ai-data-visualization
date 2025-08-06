@@ -1122,16 +1122,17 @@ REQUIREMENTS:
       li.appendChild(header);
       list.appendChild(li);
 
-      // Versions list (improvements only – skip original index 0)
-      if (item.versions.length > 1) {
+      // Versions list (including original and all improvements)
+      if (item.versions.length) {
         const vUl = document.createElement('ul');
         vUl.className = 'ai-data-viz__history-version-list';
         item.versions.forEach((v, vIdx) => {
-          if (vIdx === 0) return; // original
           const vLi = document.createElement('li');
           vLi.setAttribute('data-index', String(idx));
           vLi.setAttribute('data-version', String(vIdx));
-          const promptText = v.prompt ? v.prompt.slice(0, 120) : 'Improvement';
+          const promptText = vIdx === 0
+            ? (item.prompt.slice(0, 120) || 'Original')
+            : (v.prompt ? v.prompt.slice(0, 120) : 'Improvement');
           vLi.textContent = `v${vIdx} — ${promptText}`;
           vUl.appendChild(vLi);
         });
